@@ -12,6 +12,11 @@ object MidiReport {
             appendLine()
             appendLine("Song    : ${song.name}")
             appendLine("PPQ     : ${song.ppq}")
+            appendLine("Tempo   : ${song.tempoBpm} BPM")
+            appendLine(
+                "Métrique: ${song.timeSignature.numerator}/" +
+                        "${song.timeSignature.denominator}"
+            )
             appendLine("Tracks  : ${song.tracks.size}")
             appendLine()
 

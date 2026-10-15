@@ -7,6 +7,8 @@ import org.wysko.kmidi.midi.reader.StandardMidiFileReader
 import com.studiostefan.krometools.model.Note
 import com.studiostefan.krometools.model.Song
 import com.studiostefan.krometools.model.Track
+import org.wysko.kmidi.midi.event.MetaEvent
+import com.studiostefan.krometools.model.TimeSignature
 
 object MidiReader {
 
@@ -19,6 +21,17 @@ object MidiReader {
 
         val midiFile = reader.readByteArray(bytes)
 
+        val allEvents = midiFile.tracks
+            .flatMap { it.events }
+
+        val tempo = allEvents
+            .filterIsInstance<MetaEvent.SetTempo>()
+            .minByOrNull { it.tick }
+
+        val timeSignature = allEvents
+            .filterIsInstance<MetaEvent.TimeSignature>()
+            .minByOrNull { it.tick }
+
         val tracks = midiFile.tracks.flatMapIndexed { index, midiTrack ->
             readTracks(index, midiTrack)
         }
@@ -26,6 +39,11 @@ object MidiReader {
         return Song(
             name = songName,
             ppq = midiFile.tpq.toInt(),
+            tempoBpm = tempo?.beatsPerMinute ?: 120.0,
+            timeSignature = TimeSignature(
+                numerator = timeSignature?.numerator?.toInt() ?: 4,
+                denominator = timeSignature?.denominator?.toInt() ?: 4
+            ),
             tracks = tracks
         )
     }
@@ -155,5 +173,40 @@ object MidiReader {
         if (queue.isEmpty()) {
             pending.remove(pitch)
         }
+    }
+
+
+    fun printTimingInfo(bytes: ByteArray) {
+
+        val midiFile = reader.readByteArray(bytes)
+
+        val events = midiFile.tracks
+            .flatMap { it.events }
+
+        println()
+        println("=== TIME SIGNATURES ===")
+
+        events
+            .filterIsInstance<MetaEvent.TimeSignature>()
+            .sortedBy { it.tick }
+            .forEach {
+                println(
+                    "tick=${it.tick} → " +
+                            "${it.numerator.toInt()}/${it.denominator.toInt()}"
+                )
+            }
+
+        println()
+        println("=== TEMPOS ===")
+
+        events
+            .filterIsInstance<MetaEvent.SetTempo>()
+            .sortedBy { it.tick }
+            .forEach {
+                println(
+                    "tick=${it.tick} → " +
+                            "${it.beatsPerMinute} BPM"
+                )
+            }
     }
 }

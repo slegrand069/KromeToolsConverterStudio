@@ -13,6 +13,8 @@ fun main() {
 
     val bytes = midiFile.readBytes()
 
+    MidiReader.printTimingInfo(bytes)
+
     val song = MidiReader.read(
         bytes = bytes,
         songName = midiFile.nameWithoutExtension
