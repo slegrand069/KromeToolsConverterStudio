@@ -9,7 +9,10 @@ import com.studiostefan.krometools.model.Song
 import com.studiostefan.krometools.model.TempoChange
 import com.studiostefan.krometools.model.Track
 import org.wysko.kmidi.midi.event.MetaEvent
+import org.wysko.kmidi.midi.event.ControlChangeEvent
 import com.studiostefan.krometools.model.TimeSignature
+import com.studiostefan.krometools.model.TimeSignatureChange
+import com.studiostefan.krometools.model.ControlChange
 
 object MidiReader {
 
@@ -45,9 +48,31 @@ object MidiReader {
             .firstOrNull { it.tick == 0L }
             ?.bpm ?: 120.0
 
-        val timeSignature = allEvents
+        val timeSignatureChanges = allEvents
             .filterIsInstance<MetaEvent.TimeSignature>()
-            .minByOrNull { it.tick }
+            .sortedBy { it.tick }
+            .groupBy { it.tick }
+            .map { (tick, eventsAtTick) ->
+                val event = eventsAtTick.last()
+                val exponent = event.denominator.toInt() and 0xFF
+
+                TimeSignatureChange(
+                    tick = tick.toLong(),
+                    timeSignature = TimeSignature(
+                        numerator = event.numerator.toInt() and 0xFF,
+                        denominator = if (exponent in 0..30) {
+                            1 shl exponent
+                        } else {
+                            4
+                        }
+                    )
+                )
+            }
+            .sortedBy { it.tick }
+
+        val initialTimeSignature = timeSignatureChanges
+            .firstOrNull { it.tick == 0L }
+            ?.timeSignature ?: TimeSignature()
 
         val tracks = midiFile.tracks.flatMapIndexed { index, midiTrack ->
             readTracks(index, midiTrack)
@@ -58,17 +83,8 @@ object MidiReader {
             ppq = midiFile.tpq.toInt(),
             tempoBpm = initialTempo,
             tempoChanges = tempoChanges,
-            timeSignature = TimeSignature(
-                numerator = timeSignature?.numerator?.toInt() ?: 4,
-                denominator = timeSignature?.let {
-                    val exponent = it.denominator.toInt() and 0xFF
-                    if (exponent in 0..30) {
-                        1 shl exponent
-                    } else {
-                        4
-                    }
-                } ?: 4
-            ),
+            timeSignature = initialTimeSignature,
+            timeSignatureChanges = timeSignatureChanges,
             tracks = tracks
         )
     }
@@ -88,9 +104,13 @@ object MidiReader {
     ): List<Track> {
 
         val noteEvents = midiTrack.events.filterIsInstance<NoteEvent>()
+        val controlEvents = midiTrack.events
+            .filterIsInstance<ControlChangeEvent>()
 
-        val channels = noteEvents
-            .map { it.channel.toInt() }
+        val channels = (
+                noteEvents.map { it.channel.toInt() and 0xFF } +
+                controlEvents.map { it.channel.toInt() and 0xFF }
+                )
             .distinct()
             .sorted()
 
@@ -104,11 +124,26 @@ object MidiReader {
 
             val notes = buildNotes(noteEvents, channel)
 
+            val controlChanges = controlEvents
+                .filter {
+                    (it.channel.toInt() and 0xFF) == channel
+                }
+                .map { event ->
+                    ControlChange(
+                        tick = event.tick.toLong(),
+                        channel = event.channel.toInt() and 0xFF,
+                        controller = event.controller.toInt() and 0xFF,
+                        value = event.value.toInt() and 0xFF
+                    )
+                }
+                .sortedBy { it.tick }
+
             Track(
                 name = midiTrack.name ?: "Track ${index + 1}",
                 midiChannel = channel,
                 program = program,
-                notes = notes
+                notes = notes,
+                controlChanges = controlChanges
             )
         }
     }

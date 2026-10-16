@@ -25,7 +25,25 @@ object MidiReport {
                 "Métrique: ${song.timeSignature.numerator}/" +
                         "${song.timeSignature.denominator}"
             )
+
+            appendLine("Changements de métrique : ${song.timeSignatureChanges.size}")
+
+            song.timeSignatureChanges.forEach { change ->
+                appendLine(
+                    "  tick=${change.tick} → " +
+                            "${change.timeSignature.numerator}/" +
+                            "${change.timeSignature.denominator}"
+                )
+            }
+
             appendLine("Tracks  : ${song.tracks.size}")
+            appendLine()
+
+            val totalControlChanges = song.tracks.sumOf {
+                it.controlChanges.size
+            }
+
+            appendLine("Événements de contrôleur : $totalControlChanges")
             appendLine()
 
             song.tracks.forEachIndexed { index, track ->
@@ -58,7 +76,26 @@ object MidiReport {
                                 "tick=${lastNote.startTick + lastNote.durationTicks}"
                     )
                 }
+                appendLine("  Contrôleurs : ${track.controlChanges.size}")
 
+                track.controlChanges
+                    .groupBy { it.controller }
+                    .toSortedMap()
+                    .forEach { (controller, events) ->
+                        appendLine(
+                            "    CC $controller : ${events.size} événement(s)"
+                        )
+                    }
+
+                track.controlChanges
+                    .take(10)
+                    .forEach { event ->
+                        appendLine(
+                            "    tick=${event.tick}, " +
+                                    "CC ${event.controller}, " +
+                                    "valeur=${event.value}"
+                        )
+                    }
                 appendLine()
             }
         }
