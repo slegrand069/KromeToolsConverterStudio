@@ -6,6 +6,7 @@ import org.wysko.kmidi.midi.event.ProgramEvent
 import org.wysko.kmidi.midi.reader.StandardMidiFileReader
 import com.studiostefan.krometools.model.Note
 import com.studiostefan.krometools.model.Song
+import com.studiostefan.krometools.model.TempoChange
 import com.studiostefan.krometools.model.Track
 import org.wysko.kmidi.midi.event.MetaEvent
 import com.studiostefan.krometools.model.TimeSignature
@@ -28,6 +29,22 @@ object MidiReader {
             .filterIsInstance<MetaEvent.SetTempo>()
             .minByOrNull { it.tick }
 
+        val tempoChanges = allEvents
+            .filterIsInstance<MetaEvent.SetTempo>()
+            .sortedBy { it.tick }
+            .groupBy { it.tick }
+            .map { (tick, eventsAtTick) ->
+                TempoChange(
+                    tick = tick.toLong(),
+                    bpm = eventsAtTick.last().beatsPerMinute
+                )
+            }
+            .sortedBy { it.tick }
+
+        val initialTempo = tempoChanges
+            .firstOrNull { it.tick == 0L }
+            ?.bpm ?: 120.0
+
         val timeSignature = allEvents
             .filterIsInstance<MetaEvent.TimeSignature>()
             .minByOrNull { it.tick }
@@ -39,10 +56,18 @@ object MidiReader {
         return Song(
             name = songName,
             ppq = midiFile.tpq.toInt(),
-            tempoBpm = tempo?.beatsPerMinute ?: 120.0,
+            tempoBpm = initialTempo,
+            tempoChanges = tempoChanges,
             timeSignature = TimeSignature(
                 numerator = timeSignature?.numerator?.toInt() ?: 4,
-                denominator = timeSignature?.denominator?.toInt() ?: 4
+                denominator = timeSignature?.let {
+                    val exponent = it.denominator.toInt() and 0xFF
+                    if (exponent in 0..30) {
+                        1 shl exponent
+                    } else {
+                        4
+                    }
+                } ?: 4
             ),
             tracks = tracks
         )
@@ -176,37 +201,48 @@ object MidiReader {
     }
 
 
-    fun printTimingInfo(bytes: ByteArray) {
 
+    fun printTimingInfo(bytes: ByteArray) {
         val midiFile = reader.readByteArray(bytes)
 
-        val events = midiFile.tracks
-            .flatMap { it.events }
+        println("=== MIDI FORMAT ===")
+        println(midiFile.header.format)
 
-        println()
-        println("=== TIME SIGNATURES ===")
+        midiFile.tracks.forEachIndexed { index, track ->
+            println()
+            println("=== PISTE PHYSIQUE ${index + 1} ===")
+            println("Nom : ${track.name ?: "(sans nom)"}")
 
-        events
-            .filterIsInstance<MetaEvent.TimeSignature>()
-            .sortedBy { it.tick }
-            .forEach {
-                println(
-                    "tick=${it.tick} → " +
-                            "${it.numerator.toInt()}/${it.denominator.toInt()}"
-                )
-            }
 
-        println()
-        println("=== TEMPOS ===")
+            track.events
+                .filterIsInstance<MetaEvent.TimeSignature>()
+                .sortedBy { it.tick }
+                .forEach { event ->
+                    val denominatorExponent = event.denominator.toInt() and 0xFF
+                    val musicalDenominator =
+                        if (denominatorExponent in 0..30) {
+                            1 shl denominatorExponent
+                        } else {
+                            null
+                        }
 
-        events
-            .filterIsInstance<MetaEvent.SetTempo>()
-            .sortedBy { it.tick }
-            .forEach {
-                println(
-                    "tick=${it.tick} → " +
-                            "${it.beatsPerMinute} BPM"
-                )
-            }
+                    println(
+                        "Métrique : tick=${event.tick}, " +
+                                "numérateur=${event.numerator.toInt() and 0xFF}, " +
+                                "dénominateur brut MIDI=$denominatorExponent, " +
+                                "dénominateur musical=${musicalDenominator ?: "invalide"}"
+                    )
+                }
+
+            track.events
+                .filterIsInstance<MetaEvent.SetTempo>()
+                .sortedBy { it.tick }
+                .forEach { event ->
+                    println(
+                        "Tempo : tick=${event.tick}, " +
+                                "${event.beatsPerMinute} BPM"
+                    )
+                }
+        }
     }
 }

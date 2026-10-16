@@ -13,6 +13,14 @@ object MidiReport {
             appendLine("Song    : ${song.name}")
             appendLine("PPQ     : ${song.ppq}")
             appendLine("Tempo   : ${song.tempoBpm} BPM")
+            appendLine("Changements de tempo : ${song.tempoChanges.size}")
+
+            song.tempoChanges.forEach { change ->
+                appendLine(
+                    "  tick=${change.tick} → ${change.bpm} BPM"
+                )
+            }
+
             appendLine(
                 "Métrique: ${song.timeSignature.numerator}/" +
                         "${song.timeSignature.denominator}"

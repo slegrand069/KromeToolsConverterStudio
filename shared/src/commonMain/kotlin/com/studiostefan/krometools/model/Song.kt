@@ -4,6 +4,7 @@ data class Song(
     val name: String,
     val ppq: Int = 480,
     val tempoBpm: Double = 120.0,
+    val tempoChanges: List<TempoChange> = emptyList(),
     val timeSignature: TimeSignature = TimeSignature(),
     val tracks: List<Track> = emptyList()
 )
@@ -27,4 +28,9 @@ data class Note(
     val velocity: Int,
     val startTick: Long,
     val durationTicks: Long
+)
+
+data class TempoChange(
+    val tick: Long,
+    val bpm: Double
 )

@@ -7,7 +7,8 @@ import java.io.File
 fun main() {
 
     val midiFile = File(
-        "C:/Users/legra/Music/BOF/Le_clan_des_siciliens__Ennio_Morricone.MID"
+        //"C:/Users/legra/Music/BOF/Le_clan_des_siciliens__Ennio_Morricone.MID"
+        "C:/Users/legra/Music/BOF/Bach Conc 3P Dm Part I.MID"
     )
     println("Lecture de : ${midiFile.absolutePath}")
 
