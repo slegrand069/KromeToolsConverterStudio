@@ -8,7 +8,8 @@ fun main() {
 
     val midiFile = File(
         //"C:/Users/legra/Music/BOF/Le_clan_des_siciliens__Ennio_Morricone.MID"
-        "C:/Users/legra/Music/BOF/Bach Conc 3P Dm Part I.MID"
+        //"C:/Users/legra/Music/BOF/Bach Conc 3P Dm Part I.MID"
+        "C:/Users/legra/Music/BOF/Play the game - Queen.MID"
     )
     println("Lecture de : ${midiFile.absolutePath}")
 
